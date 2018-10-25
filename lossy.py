@@ -89,7 +89,7 @@ def lossy(graph_list, verbose=False):
 #graph1,graph2 = generate_easy_sample()
 #coupled_graph = lossy([graph1,graph2], True)
 
-res = generate_complex_sample(1000, 60, 4, 20)
+res = generate_complex_sample(1000, 700, 4, 1000)
 coupled_graph = lossy(res, True)
 
 def f(I,x=None):
@@ -113,7 +113,7 @@ def f(I,x=None):
                     for y in list(coupled_graph.predecessors(x)):
                         if y in activated:
                             total_influence += coupled_graph.edges[(y,x)]['influence']
-                            if (total_influence > activation):
+                            if (total_influence >= activation):
                                 activated.append(x)
                                 explore.append(x)
                                 break
@@ -126,8 +126,9 @@ def f(I,x=None):
     return len(activated)
 
 
-def greedy_algorithm(pourcentage_goal, T, R):
+def greedy_algorithm(pourcentage_goal, T, R, verbose=False):
     print("\n### STARTING IMPROVED GREEDY ###")
+
     #C = list(range(len()))
     I = []
     nb = len(coupled_graph.nodes)
@@ -136,12 +137,17 @@ def greedy_algorithm(pourcentage_goal, T, R):
     for u in coupled_graph.nodes:
         heappush_max(H, (f(I,u), u))
 
-    while len(I) < int(pourcentage_goal*nb) :
+    while f(I)/nb < pourcentage_goal:
         counter += 1
-        print("TURN:",counter,"; ACTIVATED:",len(I), I)
+        if (verbose):
+            print("ACTIVATED:",len(I), "; POURCENTAGE:", "{0:.2f}".format(f(I)/nb))
 
         if counter % R == 0:
+            if (verbose):
+                print("FULL ROUND !")
             for i in range(len(H)):
+                if (verbose and i % 200 == 0):
+                    print("POURCENTAGE:","{0:.2f}".format(i/len(H)))
                 fu, u = heappop_max(H)
                 heappush_max(H,(f(I,u), u))
 
@@ -152,7 +158,7 @@ def greedy_algorithm(pourcentage_goal, T, R):
                 A.append(u)
             
             for u in A:
-                H.append((u, f(I,u)))
+                heappush_max(H, (f(I,u), u))
 
         if len(H) > 0:
             fu, u = heappop_max(H)
@@ -160,10 +166,15 @@ def greedy_algorithm(pourcentage_goal, T, R):
         else:
             break
     
+    print("RESULTS, NUMBER TO ACTIVATE:", len(I), "POURCENTAGE TO ACTIVATE:", len(I)/nb)
+    if (verbose):
+        print("NODE ACTIVATED:", I)
     return I
 
-res = greedy_algorithm(0.75,15,5)
-print("RESULTS:", res, f(res))
+res = greedy_algorithm(0.25,50,25, False)
+res = greedy_algorithm(0.40,50,25, False)
+res = greedy_algorithm(0.60,50,25, False)
+res = greedy_algorithm(0.75,50,25, False)
 
 
 
