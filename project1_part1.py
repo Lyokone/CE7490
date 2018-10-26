@@ -118,28 +118,6 @@ else:
             for edge in in_edges:
                 network[edge[0]][edge[1]]['weight'] /= in_edge_sum
 
-# # Print for check.
-# print('################# NETWORK 1 #################')
-# print(network_1.nodes())
-# print(network_1.edges())
-# print(nx.get_edge_attributes(network_1, 'weight'))
-# print(nx.get_node_attributes(network_1, 'name'))
-# print(nx.get_node_attributes(network_1, 'threshold'))
-
-# print('################# NETWORK 2 #################')
-# print(network_2.nodes())
-# print(network_2.edges())
-# print(nx.get_edge_attributes(network_2, 'weight'))
-# print(nx.get_node_attributes(network_2, 'name'))
-# print(nx.get_node_attributes(network_2, 'threshold'))
-
-# print('################# NETWORK 3 #################')
-# print(network_3.nodes())
-# print(network_3.edges())
-# print(nx.get_edge_attributes(network_3, 'weight'))
-# print(nx.get_node_attributes(network_3, 'name'))
-# print(nx.get_node_attributes(network_3, 'threshold'))
-
 # Combine networks.
 combined_network = nx.compose_all(networks)
 
@@ -191,21 +169,7 @@ for name in used_names:
             networks[index].add_node('n' + str(index + 1) + '_' + str(networks[index].number_of_nodes() + 1), attr_dict = {'name': name})
             combined_network.add_node('n' + str(index + 1) + '_' + str(networks[index].number_of_nodes()), attr_dict = {'name': name, 'threshold': 1})
 
-# Print for check.
-#print(combined_network.number_of_nodes())
-#print(combined_network.number_of_edges())
-#print(combined_network.nodes())
-#print(combined_network.edges())
-#for node, data in combined_network.nodes(data = True):
-#    print(node, data)    
-#for (u, v, wt) in combined_network.edges.data():
-#    print(u, v, wt)
-
 coupled_graph = combined_network
-
-# Print for check.
-#print(coupled_graph.nodes.data())
-#print(coupled_graph.edges.data())
 
 def f(I,x=None):
 #    print("Start", I, x)
@@ -236,18 +200,15 @@ def f(I,x=None):
         print("F:",len(I), len(activated))
     return len(activated)
 
-
 def greedy_algorithm(pourcentage_goal, T, R, verbose=False):
     print("\n### STARTING IMPROVED GREEDY ###")
 
-    #C = list(range(len()))
     I = []
     nb = len(coupled_graph.nodes)
     counter = 0
     H = []
     for u in coupled_graph.nodes:
         heappush_max(H, (f(I,u), u))
-
 
     while f(I)/nb < pourcentage_goal:
         counter += 1
@@ -282,6 +243,5 @@ def greedy_algorithm(pourcentage_goal, T, R, verbose=False):
     if (verbose):
         print("NODE ACTIVATED:", I)
     return I
-
 
 res = greedy_algorithm(0.25,50,25, True)
