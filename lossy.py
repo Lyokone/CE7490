@@ -22,7 +22,7 @@ def generate_easy_sample():
     #Create the Twitter Graph
     twitter_nodes = [1, 2, 3]
     twitter_act = {1:0.5,2:0.6, 3:0.3}
-    twitter_edges = {1:{2:0.6}, 2:{1:0.2}, 3:{1:0.5}}
+    twitter_edges = {1:{2:0.6}, 2:{3:0.2}, 3:{1:0.5}}
 
     twitter = nx.DiGraph()
     twitter.add_nodes_from(twitter_nodes)
