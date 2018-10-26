@@ -58,11 +58,8 @@ def lossy(graph_list, verbose=False):
     graphs = graph_list
 
     final = nx.DiGraph()
-    
-    nx.set_node_attributes(final, 'easiness', 0.4)
-    
+        
     i = 0
-    
     for g in graphs:
         i += 1
         for n in g.nodes:
