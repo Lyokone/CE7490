@@ -4,17 +4,17 @@ import networkx as nx
 import random
 
 # Define constants.
-NUMBER_OF_NODES = 10
-EDGE_PROBABILITY = 0.1
-SMALL_TEST = True
+NUMBER_OF_NODES = 100
+EDGE_PROBABILITY = 0.01
+SMALL_TEST = False
 
 # Read names from file.
 if SMALL_TEST:
     names = ['orange','yellow','blue','green','grey']
     used_names = ['orange','yellow','blue','green','grey']
 else:    
-    #text_file = open('names.txt', 'r')
-    text_file = open('names_short.txt', 'r')
+    text_file = open('names.txt', 'r')
+#    text_file = open('names_short.txt', 'r')
     lines = text_file.readlines()
     text_file.close()
     
@@ -208,23 +208,20 @@ coupled_graph = combined_network
 #print(coupled_graph.edges.data())
 
 def f(I,x=None):
-    #print("Start", I, x)
+#    print("Start", I, x)
     if x is None:
         explore = I + []
         activated = I + []
     else:
         explore = I + [x]
         activated = I + [x]
-    explored = []
     while len(explore) > 0:
         i = explore.pop(0)
         try:
             for x in list(coupled_graph.successors(i)):
-                #print(explored)
-                activation =  coupled_graph.nodes[x]['attr_dict']['threshold']
+                activation =  coupled_graph.nodes[x]['threshold']
                 total_influence = 0
                 if x not in activated:
-                    #explored.append(x)
                     for y in list(coupled_graph.predecessors(x)):
                         if y in activated:
                             total_influence += coupled_graph.edges[(y,x)]['attr_dict']['weight']
@@ -281,7 +278,7 @@ def greedy_algorithm(pourcentage_goal, T, R, verbose=False):
         else:
             break
     
-    print("RESULTS, NUMBER TO ACTIVATE:", len(I), "POURCENTAGE TO ACTIVATE:", len(I)/nb)
+    print("RESULTS, NUMBER TO ACTIVATE:", len(I), "POURCENTAGE TO ACTIVATE:", len(I)/nb * 100)
     if (verbose):
         print("NODE ACTIVATED:", I)
     return I
