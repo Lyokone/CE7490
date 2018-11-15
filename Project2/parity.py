@@ -1,6 +1,6 @@
 from pyfinite import ffield
 
-DEBUG = True
+DEBUG = False
 
 CHUNK_SIZE = 8
 F = ffield.FField(CHUNK_SIZE)

@@ -41,7 +41,7 @@ class RAID6:
         shutil.rmtree(PATH)
         for i in range(NUMBER_OF_DISKS):
             directory = "disk_" + str(i)
-            if not os.path.exists(PATH + directory):
+            if not os.path.exists(self.PATH + directory):
                 os.makedirs(PATH + directory)
 
 
@@ -83,6 +83,23 @@ class RAID6:
         return starting_index, lenght_data
     
 
+    def read_one_chunk(self, chunk_index, exclude=[]):
+        data = []
+        p = None
+        q = None
+        for i in range(NUMBER_OF_DISKS):
+            if chunk_index + i in exclude:
+                    continue
+            with open(self.PATH + 'disk_' + str((chunk_index + i) % NUMBER_OF_DISKS) + '/' + str(chunk_index), 'rb') as f:
+                if i % NUMBER_OF_DISKS == 4:
+                    p = struct.unpack("i", f.read())[0]
+                elif i % NUMBER_OF_DISKS == 5:
+                    q = struct.unpack("i", f.read())[0]
+                else:
+                    data.append(struct.unpack("i", f.read())[0])
+
+        return data, (p,q)
+
     def read_data(self, starting_index, lenght):
         final_data = []
         parity_data = []
@@ -91,26 +108,54 @@ class RAID6:
         p = 0
         q = 0
         for i in range(lenght):
-            with open(PATH + 'disk_' + str((local_index + i) % NUMBER_OF_DISKS) + '/' + str(local_index), 'rb') as f:
+            with open(self.PATH + 'disk_' + str((local_index + i) % NUMBER_OF_DISKS) + '/' + str(local_index), 'rb') as f:
                 if i % NUMBER_OF_DISKS == 4:
-                    p = f.read()
+                    p = struct.unpack("i", f.read())[0]
                 elif i % NUMBER_OF_DISKS == 5:
                     q = f.read()
                     parity_data.append((p,q))
                     local_index += 1
                 else:
-                    final_data.append(f.read())
+                    final_data.append(struct.unpack("i", f.read())[0])
         
         original_data = ""
         for x in final_data:
-            original_data += chr(struct.unpack("i", x)[0])
+            original_data += chr(x)
 
         return original_data
 
-        
+    
+    def recovering_disks(self, disks_number):
+        if len(disks_number) == 1:
+            disk_number = disks_number[0]
+            i = 0
+            partial_data = []
+            parity_data = []
+            while i < self.current_index:
+                data, par = self.read_one_chunk(i, disks_number)
+                P,Q = par
+                if P != None:
+                    with open(self.PATH + 'disk_' + str(disk_number) + '/' + str(i), 'wb') as f:
+                        f.write(struct.pack('i', parity.recover_one_chunk_with_P(data, P)))
+
+                else:
+                    P = parity.calculate_P(data)
+                    with open(self.PATH + 'disk_' + str(disk_number) + '/' + str(i), 'wb') as f:
+                        f.write(struct.pack('i', P))
+                i += 1
+                
+
 
 
 if DEBUG:
     R = RAID6()
+
+    print("### Test writing/reading ###")
     a,b = R.write_data("coucou c'est moi")
+    print(R.read_data(a,b))
+
+    print("### Test recovering disk3 ###")
+    shutil.rmtree("disks/disk_3")
+    os.makedirs("disks/disk_3")
+    R.recovering_disks([3])
     print(R.read_data(a,b))
