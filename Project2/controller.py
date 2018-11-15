@@ -73,6 +73,7 @@ class RAID6:
 
         while len(current_data) < 4:
             current_data.append(0)
+            self.store_parity(current_data)
         
 
 
