@@ -1,9 +1,10 @@
+from pyfinite import ffield
+
 DEBUG = True
 
 CHUNK_SIZE = 8
+F = ffield.FField(CHUNK_SIZE)
 
-DISK_P = "disk3"
-DISK_Q = "disk4"
 
 
 def calculate_P(list_chunks):
@@ -13,33 +14,17 @@ def calculate_P(list_chunks):
 
     return c
 
-def shift(x, n):
-    s = str(bin(x))[2:]
-    for i in range(CHUNK_SIZE - len(s)):
-        s = "0" + s
-    for i in range(n):
-        s = s[1:] + s[0]
-    return int(s, base=2)
-
-def unshift(x, n):
-    s = str(bin(x))[2:]
-    for i in range(CHUNK_SIZE - len(s)):
-        s = "0" + s
-    for i in range(n):
-        s =  s[-1] + s[:-1] 
-    return int(s, base=2)
 
 def calculate_Q(list_chunks):
     c = list_chunks[0]
     for i in range(1,len(list_chunks)):
-        c = c ^ shift(list_chunks[i], i)
+        c = c ^ F.Multiply(2**i, list_chunks[i]) #, i))
 
     return c
         
 
 def recover_one_chunk_with_P(remaining_chunks, P_chunk):
     c = P_chunk
-    print("c",c, type(c))
     for x in remaining_chunks:
         c = c ^ x 
 
@@ -51,9 +36,25 @@ def recover_one_chunk_with_Q(all_disk_chunks, Q_chunk, missing_chunk_index):
         if i == missing_chunk_index:
             continue
 
-        c = c ^ shift(all_disk_chunks[i], i)
+        c = c ^ F.Multiply(2**i, all_disk_chunks[i])
 
-    return unshift(c, missing_chunk_index)
+    return F.Multiply(F.Inverse(2**missing_chunk_index), c)
+
+
+def recover_two_chunk(all_disk_chunks, P_chunk, Q_chunk, missing_chunk_1, missing_chunk_2):
+    A = P_chunk
+    B = Q_chunk
+    for i in range(0,len(all_disk_chunks)):
+        if i in [missing_chunk_1, missing_chunk_2]:
+            continue
+
+        A = A ^ all_disk_chunks[i]
+        B = B ^ F.Multiply(2**i, all_disk_chunks[i])
+
+    D_1 = F.Multiply(F.Inverse(2**missing_chunk_1 ^ 2**missing_chunk_2), F.Multiply(2**missing_chunk_2, A) ^ B)
+    D_2 = A ^ D_1
+    return D_1,D_2
+    
 
 
 
@@ -67,6 +68,8 @@ if (DEBUG):
     print("Q",Q, type(Q))
 
     print("Recovered:",recover_one_chunk_with_P(TEST_LIST[:-1], P))
-    print("Recovered:",recover_one_chunk_with_Q(TEST_LIST, Q, 2))
+    print("Recovered:",recover_one_chunk_with_Q(TEST_LIST, Q, 1))
+
+    print("Recovered:",recover_two_chunk(TEST_LIST, P, Q, 1, 2))
 
 
