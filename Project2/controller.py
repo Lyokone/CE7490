@@ -6,7 +6,7 @@ import struct
 
 from random import randint
 
-DEBUG = False
+DEBUG = True
 PATH = 'disks/'
 NUMBER_OF_DISKS = 6
 
@@ -56,6 +56,8 @@ class RAID6:
 
     def write_data(self, data):
         data_as_bytes = str.encode(data)
+        starting_index = self.current_index
+        lenght_data = 0
         i = 0
         current_data = []
         for value in data_as_bytes:
@@ -63,26 +65,52 @@ class RAID6:
                 if isinstance(value, int):
                     f.write(struct.pack('i', value)) # write an int
                     current_data.append(value)
-            
+                    lenght_data += 1
             i += 1
+            
             if i == NUMBER_OF_DISKS - 2:
                 self.store_parity(current_data)
                 self.current_index += 1
                 i = 0
                 current_data = []
+                lenght_data += 2
+
 
         while len(current_data) < 4:
             current_data.append(0)
             self.store_parity(current_data)
+
+        return starting_index, lenght_data
+    
+
+    def read_data(self, starting_index, lenght):
+        final_data = []
+        parity_data = []
+        local_index = starting_index
+
+        p = 0
+        q = 0
+        for i in range(lenght):
+            with open(PATH + 'disk_' + str((local_index + i) % NUMBER_OF_DISKS) + '/' + str(local_index), 'rb') as f:
+                if i % NUMBER_OF_DISKS == 4:
+                    p = f.read()
+                elif i % NUMBER_OF_DISKS == 5:
+                    q = f.read()
+                    parity_data.append((p,q))
+                    local_index += 1
+                else:
+                    final_data.append(f.read())
+        
+        original_data = ""
+        for x in final_data:
+            original_data += chr(struct.unpack("i", x)[0])
+
+        return original_data
+
         
 
 
-        #my_decoded_str = data_as_bytes.decode()
-        #print(type(my_decoded_str)) # ensure
-
-
-
 if DEBUG:
-    write_file('asd', 7, 0)
-    write_file('qwe', 9, 2)
-    clear_disks()
+    R = RAID6()
+    a,b = R.write_data("coucou c'est moi")
+    print(R.read_data(a,b))
