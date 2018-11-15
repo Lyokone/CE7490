@@ -57,7 +57,6 @@ def recover_two_chunk(all_disk_chunks, P_chunk, Q_chunk, missing_chunk_1, missin
     
 
 
-
 if (DEBUG):
     TEST_LIST = [0b11111111,0b11010101,0b11110011]
     print(TEST_LIST)
