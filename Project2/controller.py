@@ -127,7 +127,7 @@ class RAID6:
                 if i % NUMBER_OF_DISKS == 4:
                     p = struct.unpack("i", f.read())[0]
                 elif i % NUMBER_OF_DISKS == 5:
-                    q = f.read()
+                    q = struct.unpack("i", f.read())[0]
                     parity_data.append((p,q))
                     local_index += 1
                 else:
@@ -147,14 +147,20 @@ class RAID6:
             while i < self.current_index:
                 data, par = self.read_one_chunk(i, disks_number)
                 P,Q = par
-                if P != None:
+                if P != None and Q != None:
                     with open(self.PATH + 'disk_' + str(disk_number) + '/' + str(i), 'wb') as f:
                         f.write(struct.pack('i', parity.recover_one_chunk_with_P(data, P)))
 
-                else:
+                elif P == None:
                     P = parity.calculate_P(data)
                     with open(self.PATH + 'disk_' + str(disk_number) + '/' + str(i), 'wb') as f:
                         f.write(struct.pack('i', P))
+
+                elif Q == None:
+                    Q = parity.calculate_Q(data)
+                    with open(self.PATH + 'disk_' + str(disk_number) + '/' + str(i), 'wb') as f:
+                        f.write(struct.pack('i', Q))
+
                 i += 1
 
         elif len(disks_number) == 2:
@@ -165,8 +171,6 @@ class RAID6:
             while i < self.current_index:
                 data, par = self.read_one_chunk(i, disks_number)
                 P,Q = par
-
-                #print(data, P, Q)
 
 
                 if P == None and Q == None:
@@ -247,58 +251,14 @@ if DEBUG:
     os.makedirs("disks/disk_3")
     R.recovering_disks([3])
     print(R.read_data(a,b))
+    
 
-    
-    liste = [0,1]
-    print("### Test recovering disk", liste[0] ,"& disk", liste[1]," ###")
-    for i in liste:
-        shutil.rmtree("disks/disk_" + str(i))
-        os.makedirs("disks/disk_" + str(i))
-    R.recovering_disks(liste)
-    print(R.read_data(a,b))
-    
-    liste = [1,2]
-    print("### Test recovering disk", liste[0] ,"& disk", liste[1]," ###")
-    for i in liste:
-        shutil.rmtree("disks/disk_" + str(i))
-        os.makedirs("disks/disk_" + str(i))
-    R.recovering_disks(liste)
-    print(R.read_data(a,b))
-    
-     
-    liste = [2,3]
-    print("### Test recovering disk", liste[0] ,"& disk", liste[1]," ###")
-    for i in liste:
-        shutil.rmtree("disks/disk_" + str(i))
-        os.makedirs("disks/disk_" + str(i))
-    R.recovering_disks(liste)
-    print(R.read_data(a,b))
-    
-    
-    liste = [3,4]
-    print("### Test recovering disk", liste[0] ,"& disk", liste[1]," ###")
-    for i in liste:
-        shutil.rmtree("disks/disk_" + str(i))
-        os.makedirs("disks/disk_" + str(i))
-
-    R.recovering_disks(liste)
-    print(R.read_data(a,b))
-
-    liste = [4,5]
-    print("### Test recovering disk", liste[0] ,"& disk", liste[1]," ###")
-    for i in liste:
-        shutil.rmtree("disks/disk_" + str(i))
-        os.makedirs("disks/disk_" + str(i))
-
-    R.recovering_disks(liste)
-    print(R.read_data(a,b))
-    
-    liste = [5,0]
-    print("### Test recovering disk", liste[0] ,"& disk", liste[1]," ###")
-    for i in liste:
-        shutil.rmtree("disks/disk_" + str(i))
-        os.makedirs("disks/disk_" + str(i))
-
-    R.recovering_disks(liste)
-    print(R.read_data(a,b))
-    
+    listes = [[0,1],[1,2],[2,3],[3,4],[4,5],[5,0]]
+    for liste in listes:
+        print("### Test recovering disk", liste[0] ,"& disk", liste[1]," ###")
+        for i in liste:
+            shutil.rmtree("disks/disk_" + str(i))
+            os.makedirs("disks/disk_" + str(i))
+        R.recovering_disks(liste)
+        print(R.read_data(a,b))
+        

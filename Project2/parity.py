@@ -11,7 +11,6 @@ def calculate_P(list_chunks):
     c = list_chunks[0]
     for x in list_chunks[1:]:
         c = c ^ x
-
     return c
 
 
@@ -19,6 +18,7 @@ def calculate_Q(list_chunks):
     c = list_chunks[0]
     for i in range(1,len(list_chunks)):
         c = c ^ F.Multiply(2**i, list_chunks[i]) #, i))
+    
     return c
         
 
