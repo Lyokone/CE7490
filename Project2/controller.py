@@ -75,21 +75,37 @@ class RAID6:
                 current_data = []
                 lenght_data += 2
 
-
-        while len(current_data) < 4:
-            current_data.append(0)
+        if len(current_data) != 0:
+            while len(current_data) < NUMBER_OF_DISKS - 2:
+                with open(PATH + 'disk_' + str((i + self.current_index) % NUMBER_OF_DISKS) + '/' + str(self.current_index), 'wb') as f:
+                    if isinstance(0, int):
+                        f.write(struct.pack('i', 0))
+                i += 1
+                lenght_data += 1
+                current_data.append(0)
             self.store_parity(current_data)
-
+            lenght_data += 2
+            self.current_index += 1
         return starting_index, lenght_data
     
+
+    def is_P_index(self, chunk_index, disk_index):
+        if (chunk_index + self.NUMBER_OF_DISKS - 2) % self.NUMBER_OF_DISKS == disk_index:
+            return True
+        return False
+
+    def is_Q_index(self, chunk_index, disk_index):
+        if (chunk_index + self.NUMBER_OF_DISKS - 1) % self.NUMBER_OF_DISKS == disk_index:
+            return True
+        return False
 
     def read_one_chunk(self, chunk_index, exclude=[]):
         data = []
         p = None
         q = None
         for i in range(NUMBER_OF_DISKS):
-            if chunk_index + i in exclude:
-                    continue
+            if (chunk_index + i) % self.NUMBER_OF_DISKS in exclude:
+                continue
             with open(self.PATH + 'disk_' + str((chunk_index + i) % NUMBER_OF_DISKS) + '/' + str(chunk_index), 'rb') as f:
                 if i % NUMBER_OF_DISKS == 4:
                     p = struct.unpack("i", f.read())[0]
@@ -97,7 +113,6 @@ class RAID6:
                     q = struct.unpack("i", f.read())[0]
                 else:
                     data.append(struct.unpack("i", f.read())[0])
-
         return data, (p,q)
 
     def read_data(self, starting_index, lenght):
@@ -129,8 +144,6 @@ class RAID6:
         if len(disks_number) == 1:
             disk_number = disks_number[0]
             i = 0
-            partial_data = []
-            parity_data = []
             while i < self.current_index:
                 data, par = self.read_one_chunk(i, disks_number)
                 P,Q = par
@@ -143,6 +156,81 @@ class RAID6:
                     with open(self.PATH + 'disk_' + str(disk_number) + '/' + str(i), 'wb') as f:
                         f.write(struct.pack('i', P))
                 i += 1
+
+        elif len(disks_number) == 2:
+            disk1_number = disks_number[0]
+            disk2_number = disks_number[1]
+
+            i = 0
+            while i < self.current_index:
+                data, par = self.read_one_chunk(i, disks_number)
+                P,Q = par
+
+                #print(data, P, Q)
+
+
+                if P == None and Q == None:
+                    p_index = disk1_number
+                    q_index = disk2_number
+                    if self.is_P_index(i, disk2_number):
+                        p_index, q_index = q_index, p_index
+
+                    with open(self.PATH + 'disk_' + str(p_index) + '/' + str(i), 'wb') as f:
+                        f.write(struct.pack('i', parity.calculate_P(data)))
+
+                    with open(self.PATH + 'disk_' + str(q_index) + '/' + str(i), 'wb') as f:
+                        f.write(struct.pack('i', parity.calculate_Q(data)))
+
+                elif P != None and Q != None:
+                    #Get current position of the data in the list
+                    actual_index1 = (disk1_number - (i % self.NUMBER_OF_DISKS) + self.NUMBER_OF_DISKS) % self.NUMBER_OF_DISKS
+                    actual_index2 = (disk2_number - (i % self.NUMBER_OF_DISKS) + self.NUMBER_OF_DISKS) % self.NUMBER_OF_DISKS
+                    data.insert(actual_index1, 0)
+                    data.insert(actual_index2, 0)
+                    a,b = parity.recover_two_chunk(data, P, Q, actual_index1, actual_index2)
+                    with open(self.PATH + 'disk_' + str(disk1_number) + '/' + str(i), 'wb') as f:
+                        f.write(struct.pack('i', a))
+                    with open(self.PATH + 'disk_' + str(disk2_number) + '/' + str(i), 'wb') as f:
+                        f.write(struct.pack('i', b))
+
+                elif P == None :
+                    data_index = disk1_number
+                    p_index = disk2_number
+                    if self.is_P_index(i, disk1_number):
+                        data_index = disk2_number
+                        p_index = disk1_number
+
+                    with open(self.PATH + 'disk_' + str(data_index) + '/' + str(i), 'wb') as f:
+                        #Get current position of the data in the list
+                        actual_index = int((data_index - (i % self.NUMBER_OF_DISKS) + self.NUMBER_OF_DISKS) % self.NUMBER_OF_DISKS)
+                        data.insert(actual_index, 0)
+                        data[actual_index] = parity.recover_one_chunk_with_Q(data, Q, actual_index)
+                        f.write(struct.pack('i', data[actual_index]))
+
+                    with open(self.PATH + 'disk_' + str(p_index) + '/' + str(i), 'wb') as f:
+                        f.write(struct.pack('i', parity.calculate_P(data)))
+
+                elif Q == None :
+                    data_index = disk1_number
+                    q_index = disk2_number
+                    if self.is_Q_index(i, disk1_number):
+                        data_index = disk2_number
+                        q_index = disk1_number
+
+                    
+                    #Get current position of the data in the list
+                    actual_index = int((data_index - (i % self.NUMBER_OF_DISKS) + self.NUMBER_OF_DISKS) % self.NUMBER_OF_DISKS)
+                    with open(self.PATH + 'disk_' + str(data_index) + '/' + str(i), 'wb') as f:
+                        data_rec = parity.recover_one_chunk_with_P(data, P)
+                        data.insert(actual_index, data_rec)
+                        f.write(struct.pack('i', data_rec))
+
+                    with open(self.PATH + 'disk_' + str(q_index) + '/' + str(i), 'wb') as f:
+                        f.write(struct.pack('i', parity.calculate_Q(data)))
+
+
+                i += 1
+
                 
 
 
@@ -151,11 +239,66 @@ if DEBUG:
     R = RAID6()
 
     print("### Test writing/reading ###")
-    a,b = R.write_data("coucou c'est moi")
+    a,b = R.write_data("abcdefghijklmnopqrstuvwxyz")
     print(R.read_data(a,b))
 
-    print("### Test recovering disk3 ###")
+    print("### Test recovering disk 3 ###")
     shutil.rmtree("disks/disk_3")
     os.makedirs("disks/disk_3")
     R.recovering_disks([3])
     print(R.read_data(a,b))
+
+    
+    liste = [0,1]
+    print("### Test recovering disk", liste[0] ,"& disk", liste[1]," ###")
+    for i in liste:
+        shutil.rmtree("disks/disk_" + str(i))
+        os.makedirs("disks/disk_" + str(i))
+    R.recovering_disks(liste)
+    print(R.read_data(a,b))
+    
+    liste = [1,2]
+    print("### Test recovering disk", liste[0] ,"& disk", liste[1]," ###")
+    for i in liste:
+        shutil.rmtree("disks/disk_" + str(i))
+        os.makedirs("disks/disk_" + str(i))
+    R.recovering_disks(liste)
+    print(R.read_data(a,b))
+    
+     
+    liste = [2,3]
+    print("### Test recovering disk", liste[0] ,"& disk", liste[1]," ###")
+    for i in liste:
+        shutil.rmtree("disks/disk_" + str(i))
+        os.makedirs("disks/disk_" + str(i))
+    R.recovering_disks(liste)
+    print(R.read_data(a,b))
+    
+    
+    liste = [3,4]
+    print("### Test recovering disk", liste[0] ,"& disk", liste[1]," ###")
+    for i in liste:
+        shutil.rmtree("disks/disk_" + str(i))
+        os.makedirs("disks/disk_" + str(i))
+
+    R.recovering_disks(liste)
+    print(R.read_data(a,b))
+
+    liste = [4,5]
+    print("### Test recovering disk", liste[0] ,"& disk", liste[1]," ###")
+    for i in liste:
+        shutil.rmtree("disks/disk_" + str(i))
+        os.makedirs("disks/disk_" + str(i))
+
+    R.recovering_disks(liste)
+    print(R.read_data(a,b))
+    
+    liste = [5,0]
+    print("### Test recovering disk", liste[0] ,"& disk", liste[1]," ###")
+    for i in liste:
+        shutil.rmtree("disks/disk_" + str(i))
+        os.makedirs("disks/disk_" + str(i))
+
+    R.recovering_disks(liste)
+    print(R.read_data(a,b))
+    
