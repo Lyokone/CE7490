@@ -87,6 +87,8 @@ class RAID6:
         data = []
         p = None
         q = None
+
+        failed = []
         for i in range(self.NUMBER_OF_DISKS):
             if (chunk_index + i) % self.NUMBER_OF_DISKS in exclude:
                 continue
@@ -100,12 +102,16 @@ class RAID6:
                         data.append(struct.unpack("i", f.read())[0])
 
             except Exception:
-                print("[!] Error disk",i,"; Attempting recovery ...")
-                if not already_recovered:
-                    self.recovering_disks([3])
-                    return self.read_one_chunk(chunk_index, exclude, True)
-                else:
-                    raise IOError("Unrecoverable error")
+                failed.append(i)
+
+
+        if len(failed) > 0:
+            print("[!] Error disk:",failed,"; Attempting recovery ...")
+            if not already_recovered:
+                self.recovering_disks(failed)
+                return self.read_one_chunk(chunk_index, exclude, True)
+            else:
+                raise IOError("Unrecoverable error")
 
         if self.ENFORCING_CHECK and len(exclude) == 0:
             if p != parity.calculate_P(data) or q != parity.calculate_Q(data):
@@ -258,7 +264,12 @@ if DEBUG:
         R.recovering_disks(liste)
         print(R.read_data(a,b))
 
-    print("### Test auto recovery ###")
+    print("### Test auto recovery 1 disk ###")
     shutil.rmtree("disks/disk_3")
+    print(R.read_data(a,b))
+
+    print("### Test auto recovery 2 disks ###")
+    shutil.rmtree("disks/disk_3")
+    shutil.rmtree("disks/disk_5")
     print(R.read_data(a,b))
         
