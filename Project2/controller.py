@@ -7,50 +7,35 @@ import struct
 from random import randint
 
 DEBUG = True
-PATH = 'disks/'
-NUMBER_OF_DISKS = 6
-
-def write_file(name, number_of_bytes, start_disk):
-    for i in range(number_of_bytes):
-        with open(PATH + 'disk_' + str((start_disk + i) % NUMBER_OF_DISKS) + '/' + name + '_' + str(i), 'wb') as f:
-            f.write(bytes([randint(0, 255)]))
-        
-        f.close()
-
-def clear_disks():
-    folder = 'disks/disk_'
-    for i in range(NUMBER_OF_DISKS):
-        for the_file in os.listdir(folder + str(i)):
-            file_path = os.path.join(folder + str(i), the_file)
-            try:
-                if os.path.isfile(file_path):
-                    os.unlink(file_path)
-            except Exception as e:
-                print(e)
-
 
 class RAID6:
     def __init__(self):
         self.PATH = 'disks/'
-        self.NUMBER_OF_DISKS = 6
+        self.NUMBER_OF_DISKS = 8
         self.CHUNK_SIZE = 8
 
         self.current_index = 0
 
+        self.P_INDEX =  self.NUMBER_OF_DISKS - 2
+        self.Q_INDEX =  self.NUMBER_OF_DISKS - 1
+
         # Removing old directory
-        shutil.rmtree(PATH)
-        for i in range(NUMBER_OF_DISKS):
+        try:
+            shutil.rmtree(self.PATH)
+        except:
+            pass
+        for i in range(self.NUMBER_OF_DISKS):
             directory = "disk_" + str(i)
             if not os.path.exists(self.PATH + directory):
-                os.makedirs(PATH + directory)
+                os.makedirs(self.PATH + directory)
 
 
     def store_parity(self, chunk_list):
         P = parity.calculate_P(chunk_list)
         Q = parity.calculate_Q(chunk_list)
-        with open(PATH + 'disk_' + str((4 + self.current_index) % NUMBER_OF_DISKS) + '/' + str(self.current_index), 'wb') as f:
+        with open(self.PATH + 'disk_' + str((self.P_INDEX + self.current_index) % self.NUMBER_OF_DISKS) + '/' + str(self.current_index), 'wb') as f:
             f.write(struct.pack('i', P))
-        with open(PATH + 'disk_' + str((5 + self.current_index) % NUMBER_OF_DISKS) + '/' + str(self.current_index), 'wb') as f:
+        with open(self.PATH + 'disk_' + str((self.Q_INDEX + self.current_index) % self.NUMBER_OF_DISKS) + '/' + str(self.current_index), 'wb') as f:
             f.write(struct.pack('i', Q))
 
 
@@ -61,14 +46,14 @@ class RAID6:
         i = 0
         current_data = []
         for value in data_as_bytes:
-            with open(PATH + 'disk_' + str((i + self.current_index) % NUMBER_OF_DISKS) + '/' + str(self.current_index), 'wb') as f:
+            with open(self.PATH + 'disk_' + str((i + self.current_index) % self.NUMBER_OF_DISKS) + '/' + str(self.current_index), 'wb') as f:
                 if isinstance(value, int):
                     f.write(struct.pack('i', value)) # write an int
                     current_data.append(value)
                     lenght_data += 1
             i += 1
             
-            if i == NUMBER_OF_DISKS - 2:
+            if i == self.P_INDEX:
                 self.store_parity(current_data)
                 self.current_index += 1
                 i = 0
@@ -76,8 +61,8 @@ class RAID6:
                 lenght_data += 2
 
         if len(current_data) != 0:
-            while len(current_data) < NUMBER_OF_DISKS - 2:
-                with open(PATH + 'disk_' + str((i + self.current_index) % NUMBER_OF_DISKS) + '/' + str(self.current_index), 'wb') as f:
+            while len(current_data) < self.P_INDEX:
+                with open(self.PATH + 'disk_' + str((i + self.current_index) % self.NUMBER_OF_DISKS) + '/' + str(self.current_index), 'wb') as f:
                     if isinstance(0, int):
                         f.write(struct.pack('i', 0))
                 i += 1
@@ -90,12 +75,12 @@ class RAID6:
     
 
     def is_P_index(self, chunk_index, disk_index):
-        if (chunk_index + self.NUMBER_OF_DISKS - 2) % self.NUMBER_OF_DISKS == disk_index:
+        if (chunk_index + self.P_INDEX) % self.NUMBER_OF_DISKS == disk_index:
             return True
         return False
 
     def is_Q_index(self, chunk_index, disk_index):
-        if (chunk_index + self.NUMBER_OF_DISKS - 1) % self.NUMBER_OF_DISKS == disk_index:
+        if (chunk_index + self.Q_INDEX) % self.NUMBER_OF_DISKS == disk_index:
             return True
         return False
 
@@ -103,13 +88,13 @@ class RAID6:
         data = []
         p = None
         q = None
-        for i in range(NUMBER_OF_DISKS):
+        for i in range(self.NUMBER_OF_DISKS):
             if (chunk_index + i) % self.NUMBER_OF_DISKS in exclude:
                 continue
-            with open(self.PATH + 'disk_' + str((chunk_index + i) % NUMBER_OF_DISKS) + '/' + str(chunk_index), 'rb') as f:
-                if i % NUMBER_OF_DISKS == 4:
+            with open(self.PATH + 'disk_' + str((chunk_index + i) % self.NUMBER_OF_DISKS) + '/' + str(chunk_index), 'rb') as f:
+                if i % self.NUMBER_OF_DISKS == self.P_INDEX:
                     p = struct.unpack("i", f.read())[0]
-                elif i % NUMBER_OF_DISKS == 5:
+                elif i % self.NUMBER_OF_DISKS == self.Q_INDEX:
                     q = struct.unpack("i", f.read())[0]
                 else:
                     data.append(struct.unpack("i", f.read())[0])
@@ -123,10 +108,10 @@ class RAID6:
         p = 0
         q = 0
         for i in range(lenght):
-            with open(self.PATH + 'disk_' + str((local_index + i) % NUMBER_OF_DISKS) + '/' + str(local_index), 'rb') as f:
-                if i % NUMBER_OF_DISKS == 4:
+            with open(self.PATH + 'disk_' + str((local_index + i) % self.NUMBER_OF_DISKS) + '/' + str(local_index), 'rb') as f:
+                if i % self.NUMBER_OF_DISKS == self.P_INDEX:
                     p = struct.unpack("i", f.read())[0]
-                elif i % NUMBER_OF_DISKS == 5:
+                elif i % self.NUMBER_OF_DISKS == self.Q_INDEX:
                     q = struct.unpack("i", f.read())[0]
                     parity_data.append((p,q))
                     local_index += 1
@@ -231,7 +216,6 @@ class RAID6:
 
                     with open(self.PATH + 'disk_' + str(q_index) + '/' + str(i), 'wb') as f:
                         f.write(struct.pack('i', parity.calculate_Q(data)))
-
 
                 i += 1
 
