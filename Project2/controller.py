@@ -4,9 +4,7 @@ import shutil
 import parity
 import struct
 
-from random import randint
 
-DEBUG = True
 
 class RAID6:
     def __init__(self):
@@ -119,6 +117,7 @@ class RAID6:
 
         if already_recovered:
             print("[✓] Error recovered !")
+
         return data, (p,q)
 
     def read_data(self, starting_index, lenght):
@@ -134,7 +133,8 @@ class RAID6:
         
         original_data = ""
         for x in final_data:
-            original_data += chr(x)
+            if chr(x) != "\x00":
+                original_data += chr(x)
 
         return original_data
  
@@ -242,34 +242,5 @@ class RAID6:
                 
 
 
-
-if DEBUG:
-    R = RAID6()
-
-    print("### Test writing/reading ###")
-    a,b = R.write_data("abcdefghijklmnopqrstuvwxyz")
-    print(R.read_data(a,b))
-
-    print("### Test recovering disk 3 ###")
-    shutil.rmtree("disks/disk_3")
-    R.recovering_disks([3])
-    print(R.read_data(a,b))
     
-
-    listes = [[0,1]] #,[1,2],[2,3],[3,4],[4,5],[5,0]]
-    for liste in listes:
-        print("### Test recovering disk", liste[0] ,"& disk", liste[1]," ###")
-        for i in liste:
-            shutil.rmtree("disks/disk_" + str(i))
-        R.recovering_disks(liste)
-        print(R.read_data(a,b))
-
-    print("### Test auto recovery 1 disk ###")
-    shutil.rmtree("disks/disk_3")
-    print(R.read_data(a,b))
-
-    print("### Test auto recovery 2 disks ###")
-    shutil.rmtree("disks/disk_3")
-    shutil.rmtree("disks/disk_5")
-    print(R.read_data(a,b))
         

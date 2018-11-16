@@ -1,4 +1,14 @@
 {
     "python.pythonPath": "/usr/local/bin/python3",
-    "python.linting.enabled": true
+    "python.linting.enabled": true,
+    "python.unitTest.unittestArgs": [
+        "-v",
+        "-s",
+        "./Project2",
+        "-p",
+        "*test.py"
+    ],
+    "python.unitTest.pyTestEnabled": false,
+    "python.unitTest.nosetestsEnabled": false,
+    "python.unitTest.unittestEnabled": true
 }

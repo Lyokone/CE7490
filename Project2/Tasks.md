@@ -1,5 +1,5 @@
 1. [X] Store and access abstract “data objects” across storage nodes using RAID-6 for fault-tolerance
-2. [ ] Include mechanisms to determine failure of storage nodes
+2. [X] Include mechanisms to determine failure of storage nodes
 3. [X] Carry out rebuild of lost redundancy at a replacement storage node.
 4. [ ] In the objective “1” above, it is deliberately vague as to what data objects mean. You can consider them as something like x-MB data chunks. However, actual files may be much smaller, or larger than the quantum of data which is treated as an object in the system. In a practical system, it is necessary to accommodate real files of arbitrary size, taking into account issues like RAID mapping, etc.
 5. [ ] Instead of using folders to emulate nodes, extend the implementation to work across multiple (virtual) machines to realize a peer-to-peer RAIN.
