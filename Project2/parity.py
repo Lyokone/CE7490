@@ -2,7 +2,8 @@ from pyfinite import ffield
 
 DEBUG = False
 
-CHUNK_SIZE = 8
+BYTE_SIZE = 8
+CHUNK_SIZE = BYTE_SIZE * 1
 F = ffield.FField(CHUNK_SIZE)
 
 

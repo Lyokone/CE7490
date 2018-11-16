@@ -20,6 +20,7 @@ class TestRaid6(unittest.TestCase):
 
     def test_recevering_disk(self):
         a, b = self.R.write_data(self.text)
+        print(a,b)
         shutil.rmtree("disks/disk_3")
         self.R.recovering_disks([3])
         self.assertEqual(self.R.read_data(a, b), self.text)
@@ -38,6 +39,8 @@ class TestRaid6(unittest.TestCase):
         shutil.rmtree("disks/disk_3")
         shutil.rmtree("disks/disk_5")
         self.assertEqual(self.R.read_data(a, b), self.text)
+
+
 
 if __name__ == '__main__':
     unittest.main()
