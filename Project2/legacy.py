@@ -1,3 +1,15 @@
+import os
+import sys
+import shutil
+import parity
+import struct
+
+from random import randint
+
+
+PATH = ""
+NUMBER_OF_DISKS =  ""
+
 def write_file(name, number_of_bytes, start_disk):
     for i in range(number_of_bytes):
         with open(PATH + 'disk_' + str((start_disk + i) % NUMBER_OF_DISKS) + '/' + name + '_' + str(i), 'wb') as f:
