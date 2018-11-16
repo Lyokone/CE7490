@@ -19,6 +19,8 @@ class RAID6:
         self.P_INDEX =  self.NUMBER_OF_DISKS - 2
         self.Q_INDEX =  self.NUMBER_OF_DISKS - 1
 
+        self.ENFORCING_CHECK = True
+
         # Removing old directory
         try:
             shutil.rmtree(self.PATH)
@@ -29,7 +31,6 @@ class RAID6:
             if not os.path.exists(self.PATH + directory):
                 os.makedirs(self.PATH + directory)
 
-
     def store_parity(self, chunk_list):
         P = parity.calculate_P(chunk_list)
         Q = parity.calculate_Q(chunk_list)
@@ -37,7 +38,6 @@ class RAID6:
             f.write(struct.pack('i', P))
         with open(self.PATH + 'disk_' + str((self.Q_INDEX + self.current_index) % self.NUMBER_OF_DISKS) + '/' + str(self.current_index), 'wb') as f:
             f.write(struct.pack('i', Q))
-
 
     def write_data(self, data):
         data_as_bytes = str.encode(data)
@@ -73,7 +73,6 @@ class RAID6:
             self.current_index += 1
         return starting_index, lenght_data
     
-
     def is_P_index(self, chunk_index, disk_index):
         if (chunk_index + self.P_INDEX) % self.NUMBER_OF_DISKS == disk_index:
             return True
@@ -84,53 +83,68 @@ class RAID6:
             return True
         return False
 
-    def read_one_chunk(self, chunk_index, exclude=[]):
+    def read_one_chunk(self, chunk_index, exclude=[], already_recovered=False):
         data = []
         p = None
         q = None
         for i in range(self.NUMBER_OF_DISKS):
             if (chunk_index + i) % self.NUMBER_OF_DISKS in exclude:
                 continue
-            with open(self.PATH + 'disk_' + str((chunk_index + i) % self.NUMBER_OF_DISKS) + '/' + str(chunk_index), 'rb') as f:
-                if i % self.NUMBER_OF_DISKS == self.P_INDEX:
-                    p = struct.unpack("i", f.read())[0]
-                elif i % self.NUMBER_OF_DISKS == self.Q_INDEX:
-                    q = struct.unpack("i", f.read())[0]
+            try:
+                with open(self.PATH + 'disk_' + str((chunk_index + i) % self.NUMBER_OF_DISKS) + '/' + str(chunk_index), 'rb') as f:
+                    if i % self.NUMBER_OF_DISKS == self.P_INDEX:
+                        p = struct.unpack("i", f.read())[0]
+                    elif i % self.NUMBER_OF_DISKS == self.Q_INDEX:
+                        q = struct.unpack("i", f.read())[0]
+                    else:
+                        data.append(struct.unpack("i", f.read())[0])
+
+            except Exception:
+                print("[!] Error disk",i,"; Attempting recovery ...")
+                if not already_recovered:
+                    self.recovering_disks([3])
+                    return self.read_one_chunk(chunk_index, exclude, True)
                 else:
-                    data.append(struct.unpack("i", f.read())[0])
+                    raise IOError("Unrecoverable error")
+
+        if self.ENFORCING_CHECK and len(exclude) == 0:
+            if p != parity.calculate_P(data) or q != parity.calculate_Q(data):
+                raise IOError("Error")
+
+        if already_recovered:
+            print("[✓] Error recovered !")
         return data, (p,q)
 
     def read_data(self, starting_index, lenght):
         final_data = []
-        parity_data = []
         local_index = starting_index
 
-        p = 0
-        q = 0
-        for i in range(lenght):
-            with open(self.PATH + 'disk_' + str((local_index + i) % self.NUMBER_OF_DISKS) + '/' + str(local_index), 'rb') as f:
-                if i % self.NUMBER_OF_DISKS == self.P_INDEX:
-                    p = struct.unpack("i", f.read())[0]
-                elif i % self.NUMBER_OF_DISKS == self.Q_INDEX:
-                    q = struct.unpack("i", f.read())[0]
-                    parity_data.append((p,q))
-                    local_index += 1
-                else:
-                    final_data.append(struct.unpack("i", f.read())[0])
+        i = 0
+        while i < lenght:
+            data, _ = self.read_one_chunk(local_index)
+            final_data.extend(data)
+            i += self.NUMBER_OF_DISKS
+            local_index += 1
         
         original_data = ""
         for x in final_data:
             original_data += chr(x)
 
         return original_data
-
-    
+ 
     def recovering_disks(self, disks_number):
+        for i in disks_number:
+            try:
+                os.makedirs("disks/disk_" + str(i))
+            except:
+                pass
+
         if len(disks_number) == 1:
             disk_number = disks_number[0]
             i = 0
             while i < self.current_index:
                 data, par = self.read_one_chunk(i, disks_number)
+
                 P,Q = par
                 if P != None and Q != None:
                     with open(self.PATH + 'disk_' + str(disk_number) + '/' + str(i), 'wb') as f:
@@ -232,17 +246,19 @@ if DEBUG:
 
     print("### Test recovering disk 3 ###")
     shutil.rmtree("disks/disk_3")
-    os.makedirs("disks/disk_3")
     R.recovering_disks([3])
     print(R.read_data(a,b))
     
 
-    listes = [[0,1],[1,2],[2,3],[3,4],[4,5],[5,0]]
+    listes = [[0,1]] #,[1,2],[2,3],[3,4],[4,5],[5,0]]
     for liste in listes:
         print("### Test recovering disk", liste[0] ,"& disk", liste[1]," ###")
         for i in liste:
             shutil.rmtree("disks/disk_" + str(i))
-            os.makedirs("disks/disk_" + str(i))
         R.recovering_disks(liste)
         print(R.read_data(a,b))
+
+    print("### Test auto recovery ###")
+    shutil.rmtree("disks/disk_3")
+    print(R.read_data(a,b))
         
