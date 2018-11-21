@@ -7,13 +7,7 @@ class TestRaid6(unittest.TestCase):
     def setUp(self):
         self.R = controller.RAID6()
         self.text = "abcdefghijklmnopqrstuvwxyz"
-
-
-    def test_writing(self):
-        a, b = self.R.write_data(self.text)
-        self.assertEqual(a, 0)
-        self.assertEqual(b, 40)
-
+        
     def test_reading(self):
         a, b = self.R.write_data(self.text)
         self.assertEqual(self.R.read_data(a, b), self.text)

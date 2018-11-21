@@ -6,7 +6,7 @@
         "-s",
         "./Project2",
         "-p",
-        "*test.py"
+        "*_test.py"
     ],
     "python.unitTest.pyTestEnabled": false,
     "python.unitTest.nosetestsEnabled": false,

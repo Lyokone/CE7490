@@ -5,5 +5,5 @@
 5. [ ] Instead of using folders to emulate nodes, extend the implementation to work across multiple (virtual) machines to realize a peer-to-peer RAIN.
 6. [ ] Support mutable files, taking into account update of the content, and consistency issues.
 7. [ ] Support larger set of configurations (than just 6+2, using a more full-fledged implementation).
-8. [ ] Optimize the computation operations.
+8. [X] Optimize the computation operations.
 9. [ ] Anything else (please feel free to discuss during the course of the project)
