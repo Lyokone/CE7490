@@ -13,6 +13,7 @@ class RAID6:
         self.CHUNK_SIZE = 128
 
         self.current_index = 0
+        self.current_disk_index = 0
 
         self.P_INDEX =  self.NUMBER_OF_DISKS - 2
         self.Q_INDEX =  self.NUMBER_OF_DISKS - 1
@@ -48,9 +49,21 @@ class RAID6:
     def write_data(self, data):
         data_as_bytes = str.encode(data)
         starting_index = self.current_index
+        starting_disk = self.current_disk_index
         lenght_data = 0
-        i = 0
+        i = self.current_disk_index
         current_data = [[] for loop in range(self.CHUNK_SIZE)]
+
+        #getting current disk_data for mid index writing
+        if self.current_disk_index != 0:
+            data, par = self.read_one_chunk(starting_index)
+            for k in range(self.CHUNK_SIZE):
+                for j in range(len(data)):
+                    if data[j][k] != 0:
+                        current_data[k].append(data[j][k])
+                    else:
+                        break
+
         chunk_data = []
         for value in data_as_bytes:
             chunk_data.append(value)
@@ -61,6 +74,7 @@ class RAID6:
                         current_data[j].append(x)
                         f.write(struct.pack('b', x - 128)) # write an int
                         lenght_data += 1
+                self.current_disk_index = (self.current_disk_index + 1) % self.NUMBER_OF_DISKS
                 i += 1
                 chunk_data = []
                 if i == self.P_INDEX:
@@ -79,6 +93,7 @@ class RAID6:
                 for j in range(len(chunk_data), self.CHUNK_SIZE):
                     current_data[j].append(0)
                     f.write(struct.pack('b', 0 - 128)) # write an int
+            self.current_disk_index = (self.current_disk_index + 1) % self.NUMBER_OF_DISKS
             i += 1
 
         if i != self.P_INDEX and i > 0:
@@ -89,16 +104,26 @@ class RAID6:
                         current_data[j].append(0)
                 i += 1
             self.store_parity(current_data)
-            self.current_index += 1
-
-        return starting_index, lenght_data
+        return starting_index, starting_disk, lenght_data
     
     def write_data_from_file(self, file):
         starting_index = self.current_index
+        starting_disk = self.current_disk_index
         lenght_data = 0
-        i = 0
+        i = self.current_disk_index
         current_data = [[] for loop in range(self.CHUNK_SIZE)]
         chunk_data = []
+
+         #getting current disk_data for mid index writing
+        if self.current_disk_index != 0:
+            data, par = self.read_one_chunk(starting_index)
+            for k in range(self.CHUNK_SIZE):
+                for j in range(len(data)):
+                    if data[j][k] != 0:
+                        current_data[k].append(data[j][k])
+                    else:
+                        break
+
 
         with open(file, "rb") as in_file:
             value = in_file.read(1)
@@ -113,6 +138,7 @@ class RAID6:
                             current_data[j].append(x)
                             f.write(struct.pack('b', x - 128)) # write an int
                             lenght_data += 1
+                    self.current_disk_index = (self.current_disk_index + 1) % self.NUMBER_OF_DISKS
                     i += 1
                     chunk_data = []
                     if i == self.P_INDEX:
@@ -133,6 +159,7 @@ class RAID6:
                 for j in range(len(chunk_data), self.CHUNK_SIZE):
                     current_data[j].append(0)
                     f.write(struct.pack('b', 0 - 128)) # write an int
+            self.current_disk_index = (self.current_disk_index + 1) % self.NUMBER_OF_DISKS
             i += 1
 
 
@@ -145,9 +172,8 @@ class RAID6:
                         current_data[j].append(0)
                 i += 1
             self.store_parity(current_data)
-            self.current_index += 1
 
-        return starting_index, lenght_data
+        return starting_index, starting_disk, lenght_data
 
     def is_P_index(self, chunk_index, disk_index):
         if (chunk_index + self.P_INDEX) % self.NUMBER_OF_DISKS == disk_index:
@@ -198,11 +224,17 @@ class RAID6:
 
         return data, (p,q)
 
-    def read_data(self, starting_index, lenght):
+    def read_data(self, starting_index, starting_disk, lenght):
         final_data = []
         local_index = starting_index
 
         i = 0
+        data, par = self.read_one_chunk(local_index)
+        data = data[starting_disk:]
+        i += self.CHUNK_SIZE * (len(data))
+        final_data.extend(data)
+        local_index += 1
+
         while i < lenght:
             data, par = self.read_one_chunk(local_index)
             i += self.CHUNK_SIZE * (self.NUMBER_OF_DISKS - 2)
@@ -222,11 +254,25 @@ class RAID6:
 
         return original_data
  
-    def read_data_to_file(self, file, starting_index, lenght):
+    def read_data_to_file(self, file, starting_index, starting_disk, lenght):
         local_index = starting_index
 
         i = 0
         with open(file, "wb") as out_file:
+            data, par  = self.read_one_chunk(local_index)
+            data = data[starting_disk:]
+            for chunk_data in data:
+                if (i + self.CHUNK_SIZE <= lenght):
+                    i += self.CHUNK_SIZE
+                    out_file.write(bytes(chunk_data))
+                else:
+                    j = lenght - i
+                    i += j
+                    out_file.write(bytes(chunk_data[0:j]))
+                    break
+
+            local_index += 1
+
             while i < lenght:
                 data, par  = self.read_one_chunk(local_index)
                 for chunk_data in data:
@@ -372,12 +418,20 @@ class RAID6:
 
 
 R = RAID6()
+#a, b, c = R.write_data("abcdefghabcdefghabcdefghabcd")
+#print(a,b,c)
+#d, e, f = R.write_data("jesuisgenialjemappelleguillaume")
 
-a, b = R.write_data_from_file("in_big.jpg")
-print(a,b)
+R.write_data("abcdefghabcdefghabcdefghabcd")
+a, b, c = R.write_data_from_file("in_big.jpg")
+print(a,b,c)
+print(R.read_data_to_file("out_big.jpg",a,b,c))
+
+#print(R.read_data(a,b,c))
+#print(R.read_data(d,e,f))
 
 #print(value, len(value))
-shutil.rmtree("disks/disk_3")
-shutil.rmtree("disks/disk_4")
-R.recovering_disks([3,4])
-print(R.read_data_to_file("out_big.jpg",a,b))
+#shutil.rmtree("disks/disk_3")
+#shutil.rmtree("disks/disk_4")
+#R.recovering_disks([3,4])
+#print(R.read_data_to_file("out_big.jpg",a,b))
