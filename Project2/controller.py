@@ -22,6 +22,11 @@ class RAID6:
 
         self.WRITING_INFO = 'b'
 
+        #name:[{index, disk, offset, lenght}, ...]
+        self.FILES_INFO = {}
+
+        #available_place
+        self.ERASED_INFO = []
         
         # Removing old directory
         try:
@@ -33,12 +38,19 @@ class RAID6:
             if not os.path.exists(self.PATH + directory):
                 os.makedirs(self.PATH + directory)
 
-    def store_parity(self, chunk_list):
+    def store_parity(self, index_number):
+        data, par = self.read_one_chunk(index_number,self_recovering=False)
+        current_data = [[] for loop in range(self.CHUNK_SIZE)]
+        for x in data:
+            for i in range(len(x)):
+                current_data[i].append(x[i])
+
         P = []
         Q = []
-        for x in chunk_list:
-            P.append(parity.calculate_P(x))
-            Q.append(parity.calculate_Q(x))
+        for x in current_data:
+            if len(x) > 0:
+                P.append(parity.calculate_P(x))
+                Q.append(parity.calculate_Q(x))
         with open(self.PATH + 'disk_' + str((self.P_INDEX + self.current_index) % self.NUMBER_OF_DISKS) + '/' + str(self.current_index), 'wb') as f:
             for x in P:
                 f.write(struct.pack('b', x - 128))
@@ -46,23 +58,13 @@ class RAID6:
             for x in Q:        
                 f.write(struct.pack('b', x - 128))
 
-    def write_data(self, data):
-        data_as_bytes = str.encode(data)
+    def write_data(self, data, name):
         starting_index = self.current_index
         starting_disk = self.current_disk_index
         lenght_data = 0
         i = self.current_disk_index
-        current_data = [[] for loop in range(self.CHUNK_SIZE)]
 
-        #getting current disk_data for mid index writing
-        if self.current_disk_index != 0:
-            data, par = self.read_one_chunk(starting_index)
-            for k in range(self.CHUNK_SIZE):
-                for j in range(len(data)):
-                    if data[j][k] != 0:
-                        current_data[k].append(data[j][k])
-                    else:
-                        break
+        data_as_bytes = str.encode(data)
 
         chunk_data = []
         for value in data_as_bytes:
@@ -71,60 +73,42 @@ class RAID6:
                 with open(self.PATH + 'disk_' + str((i + self.current_index) % self.NUMBER_OF_DISKS) + '/' + str(self.current_index), 'wb') as f:
                     for j in range(self.CHUNK_SIZE):
                         x = chunk_data[j]
-                        current_data[j].append(x)
                         f.write(struct.pack('b', x - 128)) # write an int
                         lenght_data += 1
                 self.current_disk_index = (self.current_disk_index + 1) % self.NUMBER_OF_DISKS
                 i += 1
                 chunk_data = []
                 if i == self.P_INDEX:
-                    self.store_parity(current_data)
+                    self.store_parity(self.current_index)
                     self.current_index += 1
                     i = 0
-                    current_data = [[] for loop in range(self.CHUNK_SIZE)]
 
         if len(chunk_data) > 0:
             with open(self.PATH + 'disk_' + str((i + self.current_index) % self.NUMBER_OF_DISKS) + '/' + str(self.current_index), 'wb') as f:
                 for j in range(len(chunk_data)):
                     x = chunk_data[j]
-                    current_data[j].append(x)
                     f.write(struct.pack('b', x - 128)) # write an int
                     lenght_data += 1
-                for j in range(len(chunk_data), self.CHUNK_SIZE):
-                    current_data[j].append(0)
-                    f.write(struct.pack('b', 0 - 128)) # write an int
             self.current_disk_index = (self.current_disk_index + 1) % self.NUMBER_OF_DISKS
             i += 1
 
-        if i != self.P_INDEX and i > 0:
-            while i < self.P_INDEX:
-                with open(self.PATH + 'disk_' + str((i + self.current_index) % self.NUMBER_OF_DISKS) + '/' + str(self.current_index), 'wb') as f:
-                    for j in range(self.CHUNK_SIZE):
-                        f.write(struct.pack('b', -128))
-                        current_data[j].append(0)
-                i += 1
-            self.store_parity(current_data)
+        self.store_parity(self.current_index)
+
+        #Files Data
+        try:
+            self.FILES_INFO[name].append({'index':starting_index, 'disk':starting_disk, 'offset':0, 'lenght':lenght_data})
+        except:
+            self.FILES_INFO[name] = [{'index':starting_index, 'disk':starting_disk, 'offset':0, 'lenght':lenght_data}]
+
         return starting_index, starting_disk, lenght_data
     
-    def write_data_from_file(self, file):
+    def write_data_from_file(self, file, name):
         starting_index = self.current_index
         starting_disk = self.current_disk_index
         lenght_data = 0
         i = self.current_disk_index
-        current_data = [[] for loop in range(self.CHUNK_SIZE)]
+
         chunk_data = []
-
-         #getting current disk_data for mid index writing
-        if self.current_disk_index != 0:
-            data, par = self.read_one_chunk(starting_index)
-            for k in range(self.CHUNK_SIZE):
-                for j in range(len(data)):
-                    if data[j][k] != 0:
-                        current_data[k].append(data[j][k])
-                    else:
-                        break
-
-
         with open(file, "rb") as in_file:
             value = in_file.read(1)
             while value:
@@ -135,17 +119,15 @@ class RAID6:
                     with open(self.PATH + 'disk_' + str((i + self.current_index) % self.NUMBER_OF_DISKS) + '/' + str(self.current_index), 'wb') as f:
                         for j in range(self.CHUNK_SIZE):
                             x = chunk_data[j]
-                            current_data[j].append(x)
                             f.write(struct.pack('b', x - 128)) # write an int
                             lenght_data += 1
                     self.current_disk_index = (self.current_disk_index + 1) % self.NUMBER_OF_DISKS
                     i += 1
                     chunk_data = []
                     if i == self.P_INDEX:
-                        self.store_parity(current_data)
+                        self.store_parity(self.current_index)
                         self.current_index += 1
                         i = 0
-                        current_data = [[] for loop in range(self.CHUNK_SIZE)]
                 
                 value = in_file.read(1)
 
@@ -153,25 +135,19 @@ class RAID6:
             with open(self.PATH + 'disk_' + str((i + self.current_index) % self.NUMBER_OF_DISKS) + '/' + str(self.current_index), 'wb') as f:
                 for j in range(len(chunk_data)):
                     x = chunk_data[j]
-                    current_data[j].append(x)
                     f.write(struct.pack('b', x - 128)) # write an int
                     lenght_data += 1
-                for j in range(len(chunk_data), self.CHUNK_SIZE):
-                    current_data[j].append(0)
-                    f.write(struct.pack('b', 0 - 128)) # write an int
             self.current_disk_index = (self.current_disk_index + 1) % self.NUMBER_OF_DISKS
             i += 1
 
 
+        self.store_parity(self.current_index)
 
-        if i != self.P_INDEX and i > 0:
-            while i < self.P_INDEX:
-                with open(self.PATH + 'disk_' + str((i + self.current_index) % self.NUMBER_OF_DISKS) + '/' + str(self.current_index), 'wb') as f:
-                    for j in range(self.CHUNK_SIZE):
-                        f.write(struct.pack('b', -128))
-                        current_data[j].append(0)
-                i += 1
-            self.store_parity(current_data)
+        #Files Data
+        try:
+            self.FILES_INFO[name].append({'index':starting_index, 'disk':starting_disk, 'offset':0, 'lenght':lenght_data})
+        except:
+            self.FILES_INFO[name] = [{'index':starting_index, 'disk':starting_disk, 'offset':0, 'lenght':lenght_data}]
 
         return starting_index, starting_disk, lenght_data
 
@@ -185,7 +161,7 @@ class RAID6:
             return True
         return False
 
-    def read_one_chunk(self, chunk_index, exclude=[], already_recovered=False):
+    def read_one_chunk(self, chunk_index, exclude=[], already_recovered=False, self_recovering=True):
         data = [[] for loop in range(self.NUMBER_OF_DISKS - 2)]
         p = []
         q = []
@@ -196,28 +172,34 @@ class RAID6:
             try:
                 with open(self.PATH + 'disk_' + str((chunk_index + i) % self.NUMBER_OF_DISKS) + '/' + str(chunk_index), 'rb') as f:
                     for _ in range(self.CHUNK_SIZE):
-                        if i % self.NUMBER_OF_DISKS == self.P_INDEX:
-                            p.append(struct.unpack("b", f.read(1))[0] + 128)
-                        elif i % self.NUMBER_OF_DISKS == self.Q_INDEX:
-                            q.append(struct.unpack("b", f.read(1))[0] + 128)
-                        else:
-                            data[i].append(struct.unpack("b", f.read(1))[0] + 128)
+                        try:
+                            if i % self.NUMBER_OF_DISKS == self.P_INDEX:
+                                p.append(struct.unpack("b", f.read(1))[0] + 128)
+                            elif i % self.NUMBER_OF_DISKS == self.Q_INDEX:
+                                q.append(struct.unpack("b", f.read(1))[0] + 128)
+                            else:
+                                data[i].append(struct.unpack("b", f.read(1))[0] + 128)
+                        except:
+                            break
 
             except Exception as error:
-                print(error, data)
-                failed.append(i)
+                if self_recovering:
+                    #print(error)
+                    failed.append((chunk_index + i) % self.NUMBER_OF_DISKS)
 
-        if len(failed) > 0:
-            if not already_recovered:            
-                print("[!] Error disk:",failed,"; Attempting recovery ...")
-                self.recovering_disks(failed)
-                return self.read_one_chunk(chunk_index, exclude, True)
-            else:
-                raise IOError("Unrecoverable error")
+        if len(failed) > 0 and self_recovering: 
+            if self.ENFORCING_CHECK and len(exclude) == 0:
+                if p != parity.calculate_P(data) or q != parity.calculate_Q(data):
+                    raise IOError("Error")
 
-        if self.ENFORCING_CHECK and len(exclude) == 0:
-            if p != parity.calculate_P(data) or q != parity.calculate_Q(data):
-                raise IOError("Error")
+                    if not already_recovered:            
+                        print("[!] Error disk:",failed,"; Attempting recovery ...")
+                        self.recovering_disks(failed)
+                        return self.read_one_chunk(chunk_index, exclude, True)
+                    else:
+                        raise IOError("Unrecoverable error")
+
+
 
         if already_recovered:
             print("[✓] Error recovered !")
@@ -254,11 +236,15 @@ class RAID6:
 
         return original_data
  
-    def read_data_to_file(self, file, starting_index, starting_disk, lenght):
+    def read_data_to_file(self, file, starting_index, starting_disk, lenght, add=False):
         local_index = starting_index
 
         i = 0
-        with open(file, "wb") as out_file:
+        writing_method = "wb"
+        if add:
+            writing_method = "ab"
+
+        with open(file, writing_method) as out_file:
             data, par  = self.read_one_chunk(local_index)
             data = data[starting_disk:]
             for chunk_data in data:
@@ -338,6 +324,7 @@ class RAID6:
 
             i = 0
             while i < self.current_index:
+                #print(i, disks_number)
                 data, par = self.read_one_chunk(i, disks_number)
                 P,Q = par
 
@@ -414,7 +401,37 @@ class RAID6:
 
                 i += 1
 
+    def delete_data(self, name):
+        try:
+            position_info = self.FILES_INFO.pop(name)
+            print(self.FILES_INFO, position_info)
+            for x in position_info:
+                self.ERASED_INFO.append(x)
 
+            return True
+        except:
+            return False
+
+
+    def get_data_from_name(self, name):
+        try:
+            position_info = self.FILES_INFO[name]
+            data = ""
+            for x in position_info:
+                data += self.read_data(x['index'], x['disk'], x['lenght'])
+            return data
+        except:
+            return False
+    
+    def get_data_to_file_from_name(self, filename, name):
+        try:
+            position_info = self.FILES_INFO[name]
+            success = self.read_data_to_file(filename, position_info[0]['index'], position_info[0]['disk'], position_info[0]['lenght'])
+            for x in position_info[1:]:
+                success = success and self.read_data_to_file(filename, x['index'], x['disk'], x['lenght'], True)
+            return success
+        except:
+            return False
 
 
 R = RAID6()
@@ -422,10 +439,17 @@ R = RAID6()
 #print(a,b,c)
 #d, e, f = R.write_data("jesuisgenialjemappelleguillaume")
 
-R.write_data("abcdefghabcdefghabcdefghabcd")
-a, b, c = R.write_data_from_file("in_big.jpg")
-print(a,b,c)
-print(R.read_data_to_file("out_big.jpg",a,b,c))
+R.write_data("abcdefghabcdefghabcdefghabcd", "test")
+print(R.get_data_from_name("test"))
+
+R.write_data("abcdefghabcdefghabcdefghabcd", "test2")
+print(R.get_data_from_name("test"))
+
+R.write_data_from_file("in_big.jpg", "test3")
+
+print(R.get_data_to_file_from_name("out_big.jpg","test3"))
+R.write_data("abcdefghabcdefghabcdefghabcd", "test4")
+print(R.get_data_from_name("test4"))
 
 #print(R.read_data(a,b,c))
 #print(R.read_data(d,e,f))
