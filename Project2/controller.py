@@ -242,7 +242,6 @@ class RAID6:
                     failed.append((chunk_index + i) % self.NUMBER_OF_DISKS)
 
         if len(failed) > 0 and self_recovering: 
-            print(failed)
             if self.ENFORCING_CHECK and len(exclude) == 0:
                 if not already_recovered:            
                     print("[!] Error disk:",failed,"; Attempting recovery ...")
