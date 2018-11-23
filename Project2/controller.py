@@ -3,6 +3,7 @@ import sys
 import shutil
 import parity
 import struct
+import time
 
 
 class RAID6:
@@ -10,7 +11,7 @@ class RAID6:
         self.PATH = 'disks/'
         self.NUMBER_OF_DISKS = 8
         self.BYTE_SIZE = 8
-        self.CHUNK_SIZE = 16
+        self.CHUNK_SIZE = 128
 
         self.current_index = 0
         self.current_disk_index = 0
@@ -237,24 +238,22 @@ class RAID6:
                             break
 
             except Exception as error:
-                if self_recovering:
-                    #print(error)
+                if self_recovering and self.DISKS_INFO[chunk_index][(chunk_index + i) % self.NUMBER_OF_DISKS] > 0:
                     failed.append((chunk_index + i) % self.NUMBER_OF_DISKS)
 
         if len(failed) > 0 and self_recovering: 
+            print(failed)
             if self.ENFORCING_CHECK and len(exclude) == 0:
-                #print("Error", p, data)
-                return data, (p,q)
+                if not already_recovered:            
+                    print("[!] Error disk:",failed,"; Attempting recovery ...")
+                    self.recovering_disks(failed)
+                    return self.read_one_chunk(chunk_index, exclude, True)
+                else:
+                    raise IOError("Unrecoverable error")
+
                 if p != parity.calculate_P(data) or q != parity.calculate_Q(data):
                     raise IOError("Error")
-
-                    if not already_recovered:            
-                        print("[!] Error disk:",failed,"; Attempting recovery ...")
-                        self.recovering_disks(failed)
-                        return self.read_one_chunk(chunk_index, exclude, True)
-                    else:
-                        raise IOError("Unrecoverable error")
-
+                
 
         if already_recovered:
             print("[✓] Error recovered !")
@@ -551,10 +550,6 @@ class RAID6:
         #print("Writing_to",writing_to, similar_size)
         return self.write_data_from_file(filename, name, chunk_to_write=writing_to, offset=similar_size)
 
-            
-        
-
-
     def get_data_from_name(self, name):
         try:
             position_info = self.FILES_INFO[name]
@@ -576,27 +571,3 @@ class RAID6:
             return False
 
 
-R = RAID6()
-
-R.write_data("Test1DataDataDat", "test")
-R.write_data("Test2DataDataDat", "test2")
-R.write_data("Test21DataDataDa", "test21")
-R.write_data("Test22DataDataDa", "test22")
-
-R.delete_data("test")
-R.delete_data("test21")
-
-R.write_data_from_file("test.txt", "test3")
-#print(R.FILES_INFO["test3"])
-
-#print("Test", R.get_data_from_name("test2"))
-R.update_data_from_file("test2.txt", "test3")
-print("Test3", R.get_data_to_file_from_name("test_out.txt","test3"))
-
-print(R.FILES_INFO["test3"])
-print(R.ERASED_INFO)
-
-
-"""
-with open('disks/disk_0/0', 'rb') as f:
-    print(f.read())"""
